@@ -2,8 +2,12 @@ name: Test Action Golang Based Api trips
 on:
   push:
     branches: [ prabdeb-fork/prabdeb-test-pipeline ]
+    paths:
+    - apis/trips/*
   pull_request:
     branches: [ prabdeb-fork/prabdeb-test-pipeline ]
+    paths:
+    - apis/trips/*
 jobs:
   build:
     name: Build and Unit test
@@ -16,6 +20,7 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v2
     - name: Get dependencies
+      working-directory: apis/trips
       run: |
         go get -v -t -d ./...
         if [ -f Gopkg.toml ]; then
@@ -23,6 +28,8 @@ jobs:
             dep ensure
         fi
     - name: Build
+      working-directory: apis/trips
       run: go build -v .
     - name: Unit Test
+      working-directory: apis/trips
       run: go test -v ./tests
