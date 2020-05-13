@@ -30,6 +30,11 @@ jobs:
     - name: Build
       working-directory: apis/trips
       run: go build -v .
+    - name: Lint Code
+      run: |
+        export PATH=$PATH:$(go env GOPATH)/bin # temporary fix. See https://github.com/actions/setup-go/issues/14
+        go get -u golang.org/x/lint/golint 
+        golint
     - name: Unit Test
       working-directory: apis/trips
       run: go test -v ./tests
