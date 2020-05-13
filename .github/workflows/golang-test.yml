@@ -37,7 +37,7 @@ jobs:
         golint -set_exit_status
     - name: Unit Test
       working-directory: apis/trips
-      run: go test -v -covermode=count -coverprofile=coverage.out ./tests
+      run: go test -v ./tests
   
   integration-test:
     name: Integration Test
@@ -59,4 +59,9 @@ jobs:
             dep ensure
         fi
     - name: Run Integration Test
-      run: echo "TODO - Run Integration Test"
+      working-directory: apis/trips
+      run: go test -v ./tripsgo
+      env:
+        SQL_SERVER: ${{ secrets.SQL_SERVER }}
+        SQL_USER: ${{ secrets.SQL_USER }}
+        SQL_PASSWORD: ${{ secrets.SQL_PASSWORD }}
