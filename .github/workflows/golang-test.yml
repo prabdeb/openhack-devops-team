@@ -10,7 +10,7 @@ on:
     - apis/trips/*
 jobs:
   build:
-    name: Build and Unit test
+    name: Build, Lint and Unit test
     runs-on: ubuntu-latest
     steps:
     - name: Install Go
@@ -34,7 +34,29 @@ jobs:
       run: |
         export PATH=$PATH:$(go env GOPATH)/bin # temporary fix. See https://github.com/actions/setup-go/issues/14
         go get -u golang.org/x/lint/golint 
-        golint
+        golint -set_exit_status
     - name: Unit Test
       working-directory: apis/trips
-      run: go test -v ./tests
+      run: go test -v -covermode=count -coverprofile=coverage.out ./tests
+  
+  integration-test:
+    name: Integration Test
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+    - name: Install Go
+      uses: actions/setup-go@v2
+      with:
+        go-version: ^1.13
+    - name: Checkout code
+      uses: actions/checkout@v2
+    - name: Get dependencies
+      working-directory: apis/trips
+      run: |
+        go get -v -t -d ./...
+        if [ -f Gopkg.toml ]; then
+            curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
+            dep ensure
+        fi
+    - name: Run Integration Test
+      run: echo "TODO - Run Integration Test"
