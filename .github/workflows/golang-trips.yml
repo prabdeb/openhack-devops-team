@@ -1,0 +1,69 @@
+name: API trips CI
+on:
+  push:
+    branches: [ master ]
+    paths:
+    - apis/trips/*
+    - .github/workflows/golang-trips.yml
+  pull_request:
+    branches: [ master ]
+    paths:
+    - apis/trips/*
+    - .github/workflows/golang-trips.yml
+jobs:
+  build:
+    name: Build, Lint and Unit test
+    runs-on: ubuntu-latest
+    steps:
+    - name: Install Go
+      uses: actions/setup-go@v2
+      with:
+        go-version: ^1.13
+    - name: Checkout code
+      uses: actions/checkout@v2
+    - name: Get dependencies
+      working-directory: apis/trips
+      run: |
+        go get -v -t -d ./...
+        if [ -f Gopkg.toml ]; then
+            curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
+            dep ensure
+        fi
+    - name: Build
+      working-directory: apis/trips
+      run: go build -v .
+    - name: Lint Code
+      run: |
+        export PATH=$PATH:$(go env GOPATH)/bin # temporary fix. See https://github.com/actions/setup-go/issues/14
+        go get -u golang.org/x/lint/golint 
+        golint -set_exit_status
+    - name: Unit Test
+      working-directory: apis/trips
+      run: go test -v ./tests
+  
+  integration-test:
+    name: Integration Test
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+    - name: Install Go
+      uses: actions/setup-go@v2
+      with:
+        go-version: ^1.13
+    - name: Checkout code
+      uses: actions/checkout@v2
+    - name: Get dependencies
+      working-directory: apis/trips
+      run: |
+        go get -v -t -d ./...
+        if [ -f Gopkg.toml ]; then
+            curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
+            dep ensure
+        fi
+    - name: Run Integration Test
+      working-directory: apis/trips
+      run: go test -v ./tripsgo
+      env:
+        SQL_SERVER: ${{ secrets.SQL_SERVER }}
+        SQL_USER: ${{ secrets.SQL_USER }}
+        SQL_PASSWORD: ${{ secrets.SQL_PASSWORD }}
