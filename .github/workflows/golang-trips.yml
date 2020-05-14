@@ -3,12 +3,12 @@ on:
   push:
     branches: [ master ]
     paths:
-    - apis/trips/*
+    - apis/trips/**
     - .github/workflows/golang-trips.yml
   pull_request:
     branches: [ master ]
     paths:
-    - apis/trips/*
+    - apis/trips/**
     - .github/workflows/golang-trips.yml
 jobs:
   build:
