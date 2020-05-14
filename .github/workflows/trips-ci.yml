@@ -1,0 +1,117 @@
+name: API trips CI
+on:
+  push:
+    branches: [ master ]
+    paths:
+    - apis/trips/**
+    - .github/workflows/trips-ci.yml
+  pull_request:
+    branches: [ master ]
+    paths:
+    - apis/trips/**
+    - .github/workflows/trips-ci.yml
+
+jobs:
+  build:
+    name: Build, Lint and Unit test
+    runs-on: ubuntu-latest
+    steps:
+    - name: Install Go
+      uses: actions/setup-go@v2
+      with:
+        go-version: ^1.13
+    - name: Checkout code
+      uses: actions/checkout@v2
+    - name: Get dependencies
+      working-directory: apis/trips
+      run: |
+        go get -v -t -d ./...
+        if [ -f Gopkg.toml ]; then
+            curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
+            dep ensure
+        fi
+    - name: Build
+      working-directory: apis/trips
+      run: go build -v .
+    - name: Lint Code
+      run: |
+        export PATH=$PATH:$(go env GOPATH)/bin # temporary fix. See https://github.com/actions/setup-go/issues/14
+        go get -u golang.org/x/lint/golint 
+        golint -set_exit_status
+    - name: Unit Test
+      working-directory: apis/trips
+      run: go test -v ./tests
+  
+  integration-test:
+    name: Integration Test
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+    - name: Install Go
+      uses: actions/setup-go@v2
+      with:
+        go-version: ^1.13
+    - name: Checkout code
+      uses: actions/checkout@v2
+    - name: Get dependencies
+      working-directory: apis/trips
+      run: |
+        go get -v -t -d ./...
+        if [ -f Gopkg.toml ]; then
+            curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
+            dep ensure
+        fi
+    - name: Run Integration Test
+      working-directory: apis/trips
+      run: go test -v ./tripsgo
+      env:
+        SQL_SERVER: ${{ secrets.SQL_SERVER }}
+        SQL_USER: ${{ secrets.SQL_USER }}
+        SQL_PASSWORD: ${{ secrets.SQL_PASSWORD }}
+
+  docker_build_and_push:
+    name: Docker Build and Push
+    if: github.event_name == 'push'
+    needs: [build]
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - uses: azure/docker-login@v1
+      with:
+        login-server: openhack2b446dk2acr.azurecr.io
+        username: ${{ secrets.REGISTRY_USERNAME }}
+        password: ${{ secrets.REGISTRY_PASSWORD }}
+    
+    - name: docker build push
+      working-directory: apis/trips
+      run: |
+        docker build -t openhack2b446dk2acr.azurecr.io/devopsoh/api-trips:${{ github.sha }} .
+        docker push openhack2b446dk2acr.azurecr.io/devopsoh/api-trips:${{ github.sha }}
+  
+  deploy_webapp_staging:
+    name: Deploy to WebApp Staging Slot
+    if: github.event_name == 'push'
+    needs: [docker_build_and_push]
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: 'Login via Azure CLI'
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+    - uses: azure/webapps-deploy@v2
+      with:
+        app-name: 'openhack2b446dk2trips'
+        slot-name: 'staging'
+        images: 'openhack2b446dk2acr.azurecr.io/devopsoh/api-trips:${{ github.sha }}'
+    - name: Check the health of Staging
+      run: |
+        sleep 10
+        result=$(curl -sb -H "Accept: application/json" https://openhack2b446dk2trips-staging.azurewebsites.net/api/healthcheck/trips | grep '"status":"Healthy"')
+        echo $result
+        if [[ -z $result ]]; then
+          echo "[failed] Staging deployment is not healthy"
+          exit 1
+        else
+          echo "[successful] Staging deployment looks healthy"
+        fi
