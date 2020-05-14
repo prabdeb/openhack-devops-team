@@ -1,0 +1,35 @@
+name: API trips CI
+on:
+  push:
+    tags:
+    - 'release-trips*'
+    - 'release-all*'
+
+jobs:  
+  deploy_webapp_production:
+    name: Deploy to WebApp Production
+    if: github.event_name == 'push'
+    needs: [docker_build_and_push]
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: 'Login via Azure CLI'
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+    - name: Swap WebApp with Staging
+      run: |
+        az webapp deployment slot swap --name openhack2b446dk2trips --resource-group openhack2b446dk2rg --slot staging
+    - name: Check the health of Production and Rollback if failed
+      run: |
+        sleep 10
+        result=$(curl -sb -H "Accept: application/json" https://openhack2b446dk2trips.azurewebsites.net/api/healthcheck/trips | grep '"status":"Healthy"')
+        echo $result
+        if [[ -z $result ]]; then
+          echo "[failed] Production deployment is not healthy"
+          echo "[warning] performing rollback by swapping from staging again"
+          az webapp deployment slot swap --name openhack2b446dk2trips --resource-group openhack2b446dk2rg --slot staging
+          exit 1
+        else
+          echo "[successful] Production deployment looks healthy"
+        fi
