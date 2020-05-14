@@ -1,4 +1,4 @@
-name: API trips CI
+name: API trips Release
 on:
   push:
     tags:
@@ -8,8 +8,6 @@ on:
 jobs:  
   deploy_webapp_production:
     name: Deploy to WebApp Production
-    if: github.event_name == 'push'
-    needs: [docker_build_and_push]
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
